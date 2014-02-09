@@ -60,9 +60,13 @@ class Folder:
 
 class ProbabilityTable:
 
-    def __init__(self, word_map, total_word_count, total_word_types, total_docs_type, total_docs):
+    def __init__(self, word_map, total_word_count, total_word_types, total_docs_from_type, total_docs):
+        self.word_map = word_map
+        self.total_word_count = total_word_count
+        self.total_word_types = total_word_types
+        self.total_docs_from_type = total_docs_from_type
+        self.total_docs = total_docs
         self.lambda_value = 1
-        pass
 
     def prob_map_words(self, words):
         new_word_map = {}
@@ -78,7 +82,7 @@ class ProbabilityTable:
         return value
     
     def probability(self):
-        return total_docs_type/total_docs 
+        return total_docs_from_type/total_docs 
 
     def lambda_smooth(self, word_count):
         return (word_count + self.lambda_value) / (self.total_word_count + self.total_word_types * self.lambda_value)
@@ -89,13 +93,17 @@ class Trainer:
     def __init__(self, parent_folder):
         self.parent_folder = parent_folder
 
-    def train_spam(self):
-        spam_folder = Folder(directory='spam')
-        spam_word_map, spam_total_word_count, spam_total_word_types, spam_total_docs = spam_folder.load()
-
-    def train_ham(self):
-        ham_folder = Folder(directory='ham')
-        ham_word_map, ham_total_word_count, ham_total_word_types, ham_total_docs = ham_folder.load()
+    def train(self):
+        spam_word_map, spam_total_word_count, spam_total_word_types, spam_total_docs = folder.load()
+        ham_word_map, ham_total_word_count, ham_total_word_types, ham_total_docs = folder.load()
+        total_docs = spam_total_docs + ham_total_docs
+        spam_prob_table = prob_table = ProbabilityTable(word_map=spam_word_map, total_word_count=spam_total_word_count,
+                                                          total_word_types=spam_total_word_types, total_docs_from_type=spam_total_docs,
+                                                          total_docs=total_docs)
+        ham_prob_table = prob_table = ProbabilityTable(word_map=ham_word_map, total_word_count=ham_total_word_count,
+                                                          total_word_types=ham_total_word_types, total_docs_from_type=ham_total_docs,
+                                                          total_docs=total_docs)
+        return ham_prob_table, spam_prob_table
 
 
 class BayesClassifier:
@@ -149,7 +157,7 @@ class Runner:
 
     def train(self):
         trainer = Trainer('dataset/training')
-        self.classifier = BayesClassifier(ham_prob_table=trainer.train_ham(), spam_prob_table=trainer.train_spam())
+        self.classifier = BayesClassifier(trainer.train())
 
     def classify(self, document):
         if not self.trainer:
