@@ -1,5 +1,6 @@
 import pdb
 import math
+import os
 
 from os import listdir
 
@@ -26,7 +27,7 @@ class DocumentReader:
                 words = words + line
         word_list = words.split()
         total_word_count = len(word_list)
-        mapped_words = map(count, word_list)
+        mapped_words = map(self.count, word_list)
         mapped_word_type = reduce(self.tally_words, mapped_words)
         return mapped_word_type, total_word_count
 
@@ -35,27 +36,32 @@ class Folder:
     
     def __init__(self, directory):
         self.directory = directory
-        self.total_word_count = 0
-    
-    def reduce_files(self, prev, nxt):
-       reader = DocumentReader()
-       nxt_words_map, doc_word_count = reader.load(nxt)
-       self.total_word_count = self.total_word_count + 1
-       for key in nxt_words_map.keys():
-           match = prev.get(key)
-           if match:
-               if match['file_name'] != nxt:
-                   count = count + 1
-                   prev.update({current_key:{'file_name':nxt, 'count':count}})
-           else:
-               prev[current_key] = {'file_name':nxt, 'count':1}
-       return prev
+
+    def gen_word_map(self, files):
+        word_map = {}
+        total_word_count = 0
+        for file_name in files:
+            reader = DocumentReader()
+            file_words_map, doc_word_count = reader.load(os.path.join(self.directory, file_name))
+            total_word_count = total_word_count + doc_word_count 
+            for key in file_words_map.iterkeys():
+                match = word_map.get(key)
+                if match:
+                   if match['last_file_name'] != file_name:
+                       count = match['count']
+                       count = count + 1
+                       word_map.update({key:{'last_file_name':file_name, 'count':count}})
+                   else:
+                       pass
+                else:
+                   word_map[key] = {'last_file_name':file_name, 'count':1}
+        return word_map, total_word_count
 
     def load(self):
         ''' return word_map, total_words, total_docs '''
         file_names = listdir(self.directory)        
-        word_maps = reduce(self.reduce_files, file_names)
-        return word_maps, self.total_word_count, len(word_maps.keys()), len(file_names)
+        word_maps, total_word_count = self.gen_word_map(files=file_names)
+        return word_maps, total_word_count, len(word_maps.keys()), len(file_names)
 
 
 class ProbabilityTable:
@@ -67,16 +73,17 @@ class ProbabilityTable:
         self.total_docs_from_type = total_docs_from_type
         self.total_docs = total_docs
         self.lambda_value = 1
+        self.word_prob_dict = self.gen_word_map()
 
-    def prob_map_words(self, words):
-        new_word_map = {}
-        for word in words:
-            word_count = word_map_item['count']
-            word['value'] = self.lambda_smooth(word_count)
-            new_word_map[word.keys()[0]] = word
+    def gen_word_map(self):
+        prob_dict = {}
+        for word in self.word_map.keys():
+            pdb.set_trace()
+            prob_dict[word] = self.lambda_smooth(self.word_map[word]['count'])
+        return prob_dict 
 
     def get(self, key):
-        value = new_word_map[key]
+        value = word_prob_dict[key]
         if not value:
             return self.lambda_smooth(0)
         return value
@@ -94,13 +101,15 @@ class Trainer:
         self.parent_folder = parent_folder
 
     def train(self):
-        spam_word_map, spam_total_word_count, spam_total_word_types, spam_total_docs = folder.load()
-        ham_word_map, ham_total_word_count, ham_total_word_types, ham_total_docs = folder.load()
+        spam_folder = Folder('%s/spam' % self.parent_folder)
+        ham_folder = Folder('%s/ham' % self.parent_folder)
+        spam_word_map, spam_total_word_count, spam_total_word_types, spam_total_docs = spam_folder.load()
+        ham_word_map, ham_total_word_count, ham_total_word_types, ham_total_docs = ham_folder.load()
         total_docs = spam_total_docs + ham_total_docs
-        spam_prob_table = prob_table = ProbabilityTable(word_map=spam_word_map, total_word_count=spam_total_word_count,
+        spam_prob_table = ProbabilityTable(word_map=spam_word_map, total_word_count=spam_total_word_count,
                                                           total_word_types=spam_total_word_types, total_docs_from_type=spam_total_docs,
                                                           total_docs=total_docs)
-        ham_prob_table = prob_table = ProbabilityTable(word_map=ham_word_map, total_word_count=ham_total_word_count,
+        ham_prob_table = ProbabilityTable(word_map=ham_word_map, total_word_count=ham_total_word_count,
                                                           total_word_types=ham_total_word_types, total_docs_from_type=ham_total_docs,
                                                           total_docs=total_docs)
         return ham_prob_table, spam_prob_table
@@ -121,14 +130,16 @@ class BayesClassifier:
         word_map = reader.load(document)
         sum_spam = self._sum_spam(word_map.keys()) 
         sum_ham = self._sum_ham(word_map.keys())
-        return math.log(self.spam_prob_table.probability) + self._sum_spam() - math.log(self.ham_prob_table.probability()) - self.sum_ham()
+        z = math.log(self.ham_prob_table.probability) + self._sum_ham() - math.log(self.spam_prob_table.probability()) - self.sum_spam()
+        return 1 / (math.log(z) + 1)
     
     def prob_ham(self, document):
         reader = DocumentReader()
         word_map = reader.load(document)
         sum_spam = self._sum_spam(word_map.keys()) 
         sum_ham = self._sum_ham(word_map.keys())
-        return math.log(self.spam_prob_table.probability) + self._sum_spam() - math.log(self.ham_prob_table.probability()) - self.sum_ham()
+        z = math.log(self.spam_prob_table.probability) + self._sum_spam() - math.log(self.ham_prob_table.probability()) - self.sum_ham()
+        return 1 / (math.log(z) + 1)
         
     def _sum_spam(self, words):
         total = 0
@@ -144,10 +155,6 @@ class BayesClassifier:
             total = total + math.log(lambda_prob)
         return total
 
-    def refine_value(self, value):
-        math.log(value) #natural logarithm 
-        math.exp(value) #euler exponent
-        
 
 class Runner:
 
