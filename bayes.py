@@ -2,6 +2,7 @@ import pdb
 import math
 import os
 
+from decimal import Decimal
 from os import listdir
 
 
@@ -44,7 +45,7 @@ class Folder:
             reader = DocumentReader()
             file_words_map, doc_word_count = reader.load(os.path.join(self.directory, file_name))
             total_word_count = total_word_count + doc_word_count 
-            for key in file_words_map.iterkeys():
+            for key in file_words_map.keys():
                 match = word_map.get(key)
                 if match:
                    if match['last_file_name'] != file_name:
@@ -78,21 +79,20 @@ class ProbabilityTable:
     def gen_word_map(self):
         prob_dict = {}
         for word in self.word_map.keys():
-            pdb.set_trace()
             prob_dict[word] = self.lambda_smooth(self.word_map[word]['count'])
         return prob_dict 
 
     def get(self, key):
-        value = word_prob_dict[key]
+        value = self.word_prob_dict.get(key, False)
         if not value:
             return self.lambda_smooth(0)
         return value
     
     def probability(self):
-        return total_docs_from_type/total_docs 
+        return float(Decimal(self.total_docs_from_type) / Decimal(self.total_docs)) 
 
     def lambda_smooth(self, word_count):
-        return (word_count + self.lambda_value) / (self.total_word_count + self.total_word_types * self.lambda_value)
+        return float(Decimal(word_count + self.lambda_value) / Decimal(self.total_word_count + self.total_word_types * self.lambda_value))
 
 
 class Trainer:
@@ -123,23 +123,23 @@ class BayesClassifier:
 
     def classify(self, document):
         ''' return spam or ham '''
-        self.prob_spam(document)
+        return 'spam' if self.prob_spam(document) > self.prob_ham(document) else 'ham'
 
     def prob_spam(self, document):
         reader = DocumentReader()
-        word_map = reader.load(document)
+        word_map, doc_word_count = reader.load(document)
         sum_spam = self._sum_spam(word_map.keys()) 
         sum_ham = self._sum_ham(word_map.keys())
-        z = math.log(self.ham_prob_table.probability) + self._sum_ham() - math.log(self.spam_prob_table.probability()) - self.sum_spam()
-        return 1 / (math.log(z) + 1)
+        z = math.log(self.ham_prob_table.probability()) + sum_ham - math.log(self.spam_prob_table.probability()) - sum_spam
+        return 1 / (math.exp(z) + 1)
     
     def prob_ham(self, document):
         reader = DocumentReader()
-        word_map = reader.load(document)
+        word_map, doc_word_count = reader.load(document)
         sum_spam = self._sum_spam(word_map.keys()) 
         sum_ham = self._sum_ham(word_map.keys())
-        z = math.log(self.spam_prob_table.probability) + self._sum_spam() - math.log(self.ham_prob_table.probability()) - self.sum_ham()
-        return 1 / (math.log(z) + 1)
+        z = math.log(self.spam_prob_table.probability()) + sum_spam - math.log(self.ham_prob_table.probability()) - sum_ham
+        return 1 / (math.exp(z) + 1)
         
     def _sum_spam(self, words):
         total = 0
@@ -163,16 +163,23 @@ class Runner:
         self.classifier = None
 
     def train(self):
-        trainer = Trainer('dataset/training')
-        self.classifier = BayesClassifier(trainer.train())
+        self.trainer = Trainer('dataset/training')
+        prob_ham, prob_spam = self.trainer.train()
+        self.classifier = BayesClassifier(prob_ham, prob_spam)
 
-    def classify(self, document):
+    def classify(self):
         if not self.trainer:
             print "Please train me first"
             return
-        return self.classifier.classify(document)
+        result_dict = {}
+        reader = DocumentReader()
+        for file_name in os.listdir('dataset/test'):
+            result_dict[file_name] = self.classifier.classify(document=os.path.join('dataset/test', file_name))
+        pdb.set_trace()
+        return result_dict
+
 
 runner = Runner()
 runner.train()
-runner.classify('document')
+runner.classify()
 pdb.set_trace()
