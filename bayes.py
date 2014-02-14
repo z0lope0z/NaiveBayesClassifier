@@ -1,4 +1,3 @@
-import pdb
 import math
 import os
 
@@ -73,7 +72,7 @@ class ProbabilityTable:
         self.total_word_types = total_word_types
         self.total_docs_from_type = total_docs_from_type
         self.total_docs = total_docs
-        self.lambda_value = 1
+        self.lambda_value = 2
         self.word_prob_dict = self.gen_word_map()
 
     def gen_word_map(self):
@@ -175,11 +174,12 @@ class Runner:
         reader = DocumentReader()
         for file_name in os.listdir('dataset/test'):
             result_dict[file_name] = self.classifier.classify(document=os.path.join('dataset/test', file_name))
-        pdb.set_trace()
         return result_dict
 
 
 runner = Runner()
 runner.train()
-runner.classify()
-pdb.set_trace()
+result_dict = runner.classify()
+with open("output.txt", "wb") as output:
+    for key in sorted(result_dict.keys()):
+        output.write("{file_name}, {classification} \n".format(file_name=key, classification=result_dict[key]))
