@@ -46,10 +46,15 @@ Sample **output.txt** derived from classifying the files in dataset/test/[file].
 103.txt, ham
 104.txt, ham
 105.txt, spam
+...
+...
+...
 106.txt, ham
 107.txt, spam
 108.txt, ham
 109.txt, ham
+Total number of ham messages 127
+Total number of spam messages 133
 ```
 
 Sources:
