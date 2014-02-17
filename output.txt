@@ -258,3 +258,5 @@
 97.txt, ham 
 98.txt, ham 
 99.txt, ham 
+Total number of ham messages 127 
+Total number of spam messages 133 

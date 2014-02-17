@@ -181,5 +181,13 @@ runner = Runner()
 runner.train()
 result_dict = runner.classify()
 with open("output.txt", "wb") as output:
+    count_spam = 0
+    count_ham = 0
     for key in sorted(result_dict.keys()):
+        if result_dict[key] == 'spam':
+            count_spam = count_spam + 1
+        if result_dict[key] == 'ham':
+            count_ham = count_ham + 1
         output.write("{file_name}, {classification} \n".format(file_name=key, classification=result_dict[key]))
+    output.write("Total number of ham messages {count_ham} \n".format(count_ham=count_ham))
+    output.write("Total number of spam messages {count_spam} \n".format(count_spam=count_spam))
